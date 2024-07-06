@@ -16,37 +16,6 @@ const PROJECT_TYPES = {
     label: "Open Folder",
     createArgs: () => ({ folder: prompt() }),
   },
-  SqueakProject: {
-    path: "./squeak-project/main.js",
-    name: "SqueakProject",
-    label: "Squeak Image",
-    createArgs: async () => {
-      const type = await choose(["browser", "rpc", "yaros"]);
-      return {
-        type,
-        connectionOptions: {
-          browser: () => ({
-            path: prompt("Path?", "external/squeak-minimal.image"),
-          }),
-          rpc: () => ({
-            port: withDo(prompt("Port?", 9823), (p) => parseInt(p)),
-          }),
-          yaros: () => ({
-            path: prompt("Path?", "external/squeak-minimal-yaros.image"),
-            ports: withDo(prompt("Ports?", "8085/8084"), (p) =>
-              p.split("/").map((x) => parseInt(x)),
-            ),
-          }),
-        }[type](),
-      };
-    },
-  },
-  VRProject: {
-    path: "./vr-project/main.js",
-    name: "VRProject",
-    label: "VR Project",
-    createArgs: async () => [prompt("Path?", "external/squeak-minimal.image")],
-  },
 };
 
 async function loadProjectType(desc) {
@@ -70,44 +39,11 @@ function projectEqual(a, b) {
 
 SandblocksEditor.init();
 
-const rag = async () => (await import("./oRAGle/ragPrototype.js")).RAGApp;
 const tla = async () =>
   (await import("../extensions/tla/state-explorer.js")).TlaStateExplorer;
-const queryBuilder = async () =>
-  (await import("./query-builder/main.js")).QueryBuilder;
 
 const startUpOptions = {
-  rag: async (options) => {
-    openComponentInWindow(
-      await rag(),
-      {},
-      {
-        doNotStartAttached: true,
-        initialPosition: { x: 10, y: 10 },
-        initialSize: { x: 1000, y: 1000 },
-        ...options,
-      },
-    );
-  },
   tla: async (options) => {
-    openComponentInWindow(await tla(), options, {
-      doNotStartAttached: true,
-      initialPosition: { x: 10, y: 10 },
-      initialSize: { x: 1000, y: 800 },
-      ...options,
-    });
-  },
-  queryBuilder: async (options) => {
-    openComponentInWindow(
-      await queryBuilder(),
-      {},
-      {
-        doNotStartAttached: true,
-        initialPosition: { x: 10, y: 10 },
-        initialSize: { x: 500, y: 500 },
-        ...options,
-      },
-    );
   },
 };
 
@@ -125,16 +61,13 @@ function Sandblocks() {
   //   }, 1000);
   // }, []);
 
-  useEffect(() => {
-    if (location.hash) {
-      startUpOptions[location.hash.slice(1)]?.();
-    } else if (location.search) {
-      const params = new URLSearchParams(location.search);
-      startUpOptions[params.get("open")]?.({
-        ...Object.fromEntries(params.entries()),
-        fullscreen: params.get("fullscreen") !== null,
-      });
-    }
+  useAsyncEffect(async () => {
+    openComponentInWindow(await tla(), {}, {
+      doNotStartAttached: true,
+      initialPosition: { x: 10, y: 10 },
+      initialSize: { x: 1000, y: 800 },
+      fullscreen: true,
+    });
   }, []);
 
   useAsyncEffect(async () => {
@@ -153,90 +86,7 @@ function Sandblocks() {
     }
   }, []);
 
-  useEffect(() => {
-    const handler = (e) => {
-      if (matchesKey(e, "Ctrl-g")) {
-        // openComponentInWindow(Workspace, {});
-      } else if (matchesKey(e, "Ctrl-0")) {
-        const search = document.createElement("sb-search");
-        // FIXME
-        search.project = openProjects[0];
-        document.body.appendChild(search);
-      } else {
-        return;
-      }
-      e.preventDefault();
-      e.stopPropagation();
-    };
-    document.body.addEventListener("keydown", handler);
-    return () => document.body.removeEventListener("keydown", handler);
-  }, [openProjects]);
-
-  useEffect(() => {
-    localStorage.lastProjects = JSON.stringify(
-      openProjects.map((p) => p.fullSerialize()),
-    );
-  }, [openProjects]);
-  useEffect(() => {
-    localStorage.recentProjects = JSON.stringify(
-      recentProjects.map((p) => p.fullSerialize()),
-    );
-  }, [recentProjects]);
-  useEffect(() => {
-    const handler = (e) => {
-      if (openProjects.some((p) => p.unsavedChanges)) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-
-      localStorage.lastProjects = JSON.stringify(
-        openProjects.map((p) => p.fullSerialize()),
-      );
-    };
-    window.addEventListener("beforeunload", handler);
-
-    return () => window.removeEventListener("beforeunload", (e) => handler);
-  }, [openProjects]);
-
-  return [
-    h(
-      "div",
-      { style: "flex" },
-      button("Open Project", async () => {
-        const desc = await choose(Object.values(PROJECT_TYPES), (i) => i.label);
-        if (!desc) return;
-        const project = new (await loadProjectType(desc))(
-          await desc.createArgs(),
-        );
-        await project.open();
-        setOpenProjects((p) => [...p, project]);
-        setRecentProjects((p) => [
-          project,
-          ...p.filter((x) => !projectEqual(x, project)),
-        ]);
-      }),
-      button("Open Recent", async () => {
-        const project = await choose(recentProjects, (i) => i.name);
-        if (!project) return;
-        await project.open();
-        setOpenProjects((p) => [...p, project]);
-      }),
-      button("RAG", async () => openComponentInWindow(await rag())),
-      button("TLA Sequence Diagram", async () =>
-        openComponentInWindow(await tla()),
-      ),
-      button("Query Builder", async () =>
-        openComponentInWindow(await queryBuilder()),
-      ),
-      openProjects.map((project) =>
-        project.renderItem({
-          onClose: () => setOpenProjects((p) => p.filter((x) => x !== project)),
-        }),
-      ),
-      button("Preferences", () => openPreferences()),
-    ),
-    openProjects.map((project) => project.renderBackground?.()),
-  ];
+  return 'Loading SpecTacles ...';
 }
 
 render(h(Sandblocks), document.body);
